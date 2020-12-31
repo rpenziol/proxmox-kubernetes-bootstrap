@@ -36,6 +36,7 @@
       "http_directory": "ubuntu-20.04-server",
       "http_bind_address": "10.0.128.155",
       "unmount_iso": true,
+      "boot": "order=scsi0;ide2",
       "boot_wait": "10s",
       "boot_command": [
         "<esc><wait>",
