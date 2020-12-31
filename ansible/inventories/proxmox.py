@@ -3,25 +3,21 @@
 import requests
 import re
 
-try:
-    import json
-except ImportError:
-    import simplejson as json
+import json
 import os
 import sys
 from optparse import OptionParser
-# import logging
 
 from six import iteritems
 
 # disable InsecureRequestWarning
-requests.packages.urllib3.disable_warnings()
-#enable debug loggig
-# logging.basicConfig(level=logging.DEBUG)
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 class ProxmoxNodeList(list):
     def get_names(self):
-        return [node['node'] for node in self if node['status'] == 'online' ]
+        return [node['node'] for node in self if node['status'] == 'online']
 
 
 class ProxmoxVM(dict):
@@ -63,7 +59,7 @@ class ProxmoxPoolList(list):
 
 class ProxmoxVersion(dict):
     def get_version(self):
-        return float(re.findall(r'\d.\d',self['version'])[0])
+        return float(re.findall(r'\d.\d', self['version'])[0])
 
 
 class ProxmoxPool(dict):
@@ -157,11 +153,10 @@ class ProxmoxAPI(object):
     def node_qemu_description(self, node, vm):
         return self.vm_description_by_type(node, vm, 'qemu')
 
-    
     def node_qemu_ip(self, node, vm):
         try:
             return self.get('api2/json/nodes/{0}/qemu/{1}/agent/network-get-interfaces'.format(node, vm))
-        except:
+        except Exception:
             return False
 
     def pools(self):
@@ -172,7 +167,8 @@ class ProxmoxAPI(object):
 
     def version(self):
         return ProxmoxVersion(self.get('api2/json/version'))
-    
+
+
 def main_list(options, config_path):
     results = {
         'all': {
@@ -194,7 +190,7 @@ def main_list(options, config_path):
             if error.response.status_code == 595:
                 continue
             # on other errors
-            raise PipelineServiceError("{reason}".format(reason=error))
+            raise RuntimeError("{reason}".format(reason=error))
         results['all']['hosts'] += qemu_list.get_names()
         results['_meta']['hostvars'].update(qemu_list.get_variables())
 
@@ -296,7 +292,7 @@ def main():
     parser.add_option('--password', default=os.environ.get('PROXMOX_PASSWORD'), dest='password')
     parser.add_option('--pretty', action="store_true", default=False, dest='pretty')
     parser.add_option('--trust-invalid-certs', action="store_false", default=bool_validate_cert, dest='validate')
-    (options, args) = parser.parse_args()
+    options, _ = parser.parse_args()
 
     if options.list:
         data = main_list(options, config_path)
