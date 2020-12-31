@@ -1,0 +1,30 @@
+---
+- hosts: localhost
+
+  tasks:
+    - set_fact:
+       id: "{{ range(10000, 99999) | random }}"
+
+    - name: Clone ubuntu-20.04-server VM
+      community.general.proxmox_kvm:
+        api_user: "{{ proxmox_details.api_user }}"
+        api_password: "{{ proxmox_details.api_password }}"
+        api_host: "{{ proxmox_details.host_ip }}"
+        clone: ubuntu-20.04-server
+        name: ubuntu-{{ id }}
+        node: "{{ proxmox_details.node }}"
+        storage: "{{ proxmox_details.storage }}"
+      register: new_vm
+    
+    - name: Get new VM's id
+      set_fact:
+        vmid: "{{ new_vm.msg | regex_replace('.*newid ') | regex_replace(' cloned.*') }}"
+    
+    - name: Start VM
+      community.general.proxmox_kvm:
+        api_user: "{{ proxmox_details.api_user }}"
+        api_password: "{{ proxmox_details.api_password }}"
+        api_host: "{{ proxmox_details.host_ip }}"
+        node: "{{ proxmox_details.node }}"
+        vmid: "{{ vmid }}"
+        state: started

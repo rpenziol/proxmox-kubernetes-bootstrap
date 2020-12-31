@@ -1,0 +1,64 @@
+- hosts: running
+  become_method: sudo
+  become_user: root
+  remote_user: vagrant
+  become: yes
+  gather_facts: no
+
+  tasks:
+  - name: Wait for system to become reachable
+    wait_for_connection:
+
+  - name: Gather facts for first time
+    setup:
+
+  - name: Disable root login over SSH
+    lineinfile: dest=/etc/ssh/sshd_config regexp="^PermitRootLogin" line="PermitRootLogin no" state=present
+    notify:
+      - restart sshd
+
+  - name: Disable password login
+    lineinfile: dest=/etc/ssh/sshd_config regexp="^PasswordAuthentication" line="PasswordAuthentication no" state=present
+    notify:
+      - restart sshd
+  
+  - name: Disable automatic apt updates
+    systemd:
+      name: unattended-upgrades
+      state: stopped
+      enabled: no
+
+  - name: apt updates
+    apt:
+        force_apt_get: yes
+        update_cache: yes
+        upgrade: safe
+        autoremove: yes
+        autoclean: yes
+    notify:
+      - reboot
+
+  - name: Checking if updates require reboot
+    stat:
+      path: /var/run/reboot-required
+    register: reboot_required
+
+  - name: Reboot
+    reboot:
+      reboot_timeout: 3600
+    when: reboot_required.stat.exists
+  
+  - name: Install nfs-common
+    apt:
+      name: nfs-common
+      state: present
+      update_cache: yes
+
+  handlers:
+  - name: restart sshd
+    service:
+      name: sshd
+      state: restarted
+  - name: reboot
+    reboot:
+      reboot_timeout: 3600
