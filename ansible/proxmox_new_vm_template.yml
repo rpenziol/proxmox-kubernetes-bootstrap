@@ -1,0 +1,25 @@
+- hosts: proxmox
+  become: true
+  become_method: sudo
+
+  roles:
+    - role: inoxio.proxmox_vms
+      proxmox:
+        api_user: "{{ proxmox_details.api_user }}"
+        api_password: "{{ proxmox_details.api_password }}"
+        api_host: "{{ proxmox_details.host_ip }}"
+      vms:
+        ubuntu1804:
+          node: "{{ proxmox_details.node }}"
+          ubuntu_distribution: bionic
+          locale: en_US
+          root_password: vagrant
+          cores: 4
+          memory_size: 4096
+          virtio: '{"virtio0":"raid:32,format=qcow2,cache=writeback,discard=on"}'
+          additional_packages:
+             - openssh-server
+             - sudo
+             - qemu-guest-agent
+             - haveged
+             - python-apt

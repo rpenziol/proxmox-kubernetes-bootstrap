@@ -1,0 +1,9 @@
+- hosts: physical
+  become_method: sudo
+  become_user: root
+
+  roles:
+  - role: ubuntu_update
+    become: true
+    tags:
+      - updates
