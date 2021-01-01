@@ -1,4 +1,4 @@
-- hosts: running
+- hosts: k8s-cluster
   become_method: sudo
   become_user: root
   remote_user: vagrant
