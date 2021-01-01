@@ -5,13 +5,13 @@
     - set_fact:
        id: "{{ range(10000, 99999) | random }}"
 
-    - name: Clone ubuntu-20.04-server VM
+    - name: Clone ubuntu-20.04-server template
       community.general.proxmox_kvm:
         api_user: "{{ proxmox_details.api_user }}"
         api_password: "{{ proxmox_details.api_password }}"
         api_host: "{{ proxmox_details.host_ip }}"
         clone: ubuntu-20.04-server
-        name: ubuntu-{{ id }}
+        name: k8s-kubelet-{{ id }}
         node: "{{ proxmox_details.node }}"
         storage: "{{ proxmox_details.storage }}"
       register: new_vm
@@ -28,3 +28,13 @@
         node: "{{ proxmox_details.node }}"
         vmid: "{{ vmid }}"
         state: started
+
+    - name: Set groups
+      community.general.proxmox_kvm:
+        api_user: "{{ proxmox_details.api_user }}"
+        api_password: "{{ proxmox_details.api_password }}"
+        api_host: "{{ proxmox_details.host_ip }}"
+        node: "{{ proxmox_details.node }}"
+        vmid: "{{ vmid }}"
+        description: "{\"groups\": [\"kube-node\"]}"
+        update: true
