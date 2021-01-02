@@ -11,9 +11,10 @@ This is a collection of resources to get a Kubernetes cluster up and running in 
 * Install Ansible and its dependencies
 
     ```bash
-    pip install -r ansible/requirements.txt
+    python -m pip install -r ansible/requirements.txt
+    exec bash --login  # Reload shell to add 'ansible-playbook' and 'ansible-galaxy' to your path
     ```
-    Note: in some environments you may need to use `pip3` instead of `pip`
+    Note: in some environments you may need to use `python3` instead of `python`
 * Install Ansible collections
     ```bash
     ansible-galaxy install -r ansible/requirements.yml
@@ -44,14 +45,14 @@ Workaround for WSL: Install Packer on Windows and run these commands from PowerS
 ansible-playbook proxmox_k8s_new_master_vm.yml
 
 # Use a for loop to create multiple systems. Replace the 'X' with the number of VMs you want.
-for i in {1..X} ; do proxmox_k8s_new_master_vm.yml ; done
+for i in {1..X} ; do ansible-playbook proxmox_k8s_new_master_vm.yml ; done
 ```
 ## Create Kubernetes kubelet VMs
 ```bash
 ansible-playbook proxmox_k8s_new_kubelet_vm.yml
 
 # Use a for loop to create multiple systems. Replace the 'X' with the number of VMs you want.
-for i in {1..X} ; do proxmox_k8s_new_kubelet_vm.yml ; done
+for i in {1..X} ; do ansible-playbook proxmox_k8s_new_kubelet_vm.yml ; done
 ```
 
 ## Prepare VMs
@@ -62,10 +63,8 @@ ansible-playbook proxmox_k8s_vm_base_setup.yml
 
 ### Copy sample inventory files
 ```bash
-CID=$(docker create quay.io/kubespray/kubespray:v2.14.2)
-
-docker cp ${CID}:/kubespray/inventory/sample mycluster
-
+CID=$(docker create quay.io/kubespray/kubespray:v2.14.2) && \
+docker cp ${CID}:/kubespray/inventory/sample mycluster && \
 docker rm ${CID}
 ```
 
