@@ -35,8 +35,6 @@
         upgrade: safe
         autoremove: yes
         autoclean: yes
-    notify:
-      - reboot
 
   - name: Checking if updates require reboot
     stat:
@@ -59,6 +57,3 @@
     service:
       name: sshd
       state: restarted
-  - name: reboot
-    reboot:
-      reboot_timeout: 3600
