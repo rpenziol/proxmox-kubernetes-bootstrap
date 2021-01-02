@@ -1,3 +1,4 @@
 .vscode
+mycluster
 packer/packer_cache
 packer/variables.json
