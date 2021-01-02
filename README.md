@@ -19,7 +19,7 @@ This is a collection of resources to get a Kubernetes cluster up and running in 
     ansible-galaxy install -r ansible/requirements.yml
     ```
 
-# Packer
+# Packer - Create a VM template
 Copy the template variables file
 ```bash
 cp packer/example-variables.json packer/variables.json
@@ -37,7 +37,7 @@ Note: Packer may fail if the VM doesn't have access to the same network as your 
 
 Workaround for WSL: Install Packer on Windows and run these commands from PowerShell or CMD
 
-# Ansible
+# Ansible - Clone and prepare Kubernetes VMs
 **Note: All 'ansible-playbook' commands should be run from the 'ansible' directory**
 ## Create Kubernetes master VMs
 ```bash
@@ -58,8 +58,7 @@ for i in {1..X} ; do proxmox_k8s_new_kubelet_vm.yml ; done
 ```bash
 ansible-playbook proxmox_k8s_vm_base_setup.yml
 ```
-# Kubernetes
-## Kubespray
+# Kubespray - Deploy Kubernetes
 
 ### Copy sample inventory files
 ```bash
@@ -83,7 +82,7 @@ docker run --name kubespray -d -t \
 
 docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py -i inventory/mycluster/inventory.ini  --user=vagrant --become --become-user=root cluster.yml
 ```
-## kubectl
+# kubectl - Manager your Kubernetes cluster
 ### Authorization
 ```bash
 mkdir -p $HOME/.kube
