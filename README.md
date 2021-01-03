@@ -3,11 +3,11 @@
 ## Description
 This is a collection of resources to get a Kubernetes cluster up and running in a Proxmox Virtual Environment. These tools and commands assume the user is executing in a Linux or Linux-like environment.
 # Prerequisites
-* Proxmox server up and running
+* Proxmox 6 or newer server up and running
 * A set of RSA SSH keys generated
 * Install Python 3
 * [Install Docker](https://github.com/docker/docker-install#usage)
-* [Install Packer 1.6.6+](https://learn.hashicorp.com/tutorials/packer/getting-started-install)
+* [Install Packer](https://learn.hashicorp.com/tutorials/packer/getting-started-install) 1.6.6 or newer
 * Install Ansible and its dependencies
 
     ```bash
@@ -21,13 +21,13 @@ This is a collection of resources to get a Kubernetes cluster up and running in 
     ```
 
 # Packer - Create a VM template
-Copy the template variables file
+## Copy the template configuration file
 ```bash
 cp packer/example-variables.json packer/variables.json
 ```
 Fill in the `packer/variables.json` file with values that are appropriate for your environment.
 
-Now, create your ubuntu-2004-server template
+## Create your ubuntu-2004-server template
 ```bash
 cd packer  # Note: packer's 'http_directory' is a relative path
 packer build -var-file="variables.json" ubuntu-2004-server.json
@@ -39,6 +39,15 @@ Note: Packer may fail if the VM doesn't have access to the same network as your 
 Workaround for WSL: Install Packer on Windows and run these commands from PowerShell or CMD
 
 # Ansible - Clone and prepare Kubernetes VMs
+
+## Copy the template configuration files
+```bash
+cp ansible/group_vars/example-all.yml ansible/group_vars/all.yml
+cp ansible/inventories/example-hosts.yml ansible/inventories/hosts.yml
+cp ansible/inventories/example-proxmox.json ansible/inventories/proxmox.json
+```
+Fill in the `ansible/group_vars/all.yml`, `ansible/inventories/hosts.yml`, and `ansible/inventories/proxmox.json` files with values that are appropriate for your environment.
+
 ## Create Kubernetes master VMs
 Note: All `ansible-playbook` commands should be run from the 'ansible' directory
 
