@@ -1,0 +1,27 @@
+- hosts: localhost
+
+  tasks:
+  - name: Create temporary directory for git clone
+    tempfile:
+      state: directory
+      suffix: temp
+    register: temp_dir
+  
+  - name: Clone Kubespray repo
+    git:
+      repo: https://github.com/kubernetes-sigs/kubespray.git
+      dest: "{{ temp_dir.path }}"
+  
+  - name: Build Kubespray image as 'kubespray_github'
+    community.general.docker_image:
+      name: kubespray_github
+      build:
+        path: "{{ temp_dir.path }}"
+        pull: true
+      source: build
+
+  - name: Delete Kubespray repo
+    file:
+      path: "{{ temp_dir.path }}"
+      state: absent
+    when: temp_dir.path is defined

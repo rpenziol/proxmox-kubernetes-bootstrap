@@ -39,8 +39,9 @@ Note: Packer may fail if the VM doesn't have access to the same network as your 
 Workaround for WSL: Install Packer on Windows and run these commands from PowerShell or CMD
 
 # Ansible - Clone and prepare Kubernetes VMs
-**Note: All 'ansible-playbook' commands should be run from the 'ansible' directory**
 ## Create Kubernetes master VMs
+Note: All `ansible-playbook` commands should be run from the 'ansible' directory
+
 ```bash
 ansible-playbook proxmox_k8s_new_master_vm.yml
 
@@ -61,23 +62,34 @@ ansible-playbook proxmox_k8s_vm_base_setup.yml
 ```
 # Kubespray - Deploy Kubernetes
 
-### Copy sample inventory files
+## Create kubespray Docker image (Optional)
+Note: This will pull the latest kubespray changes from GitHub, where the official hosted kubespray Docker image may be months old
 ```bash
-CID=$(docker create quay.io/kubespray/kubespray:v2.14.2) && \
+# This will take a few minutes
+ansible-playbook kubespray_create_docker_image.yml
+```
+## Copy sample inventory files
+```bash
+# Run this command if you did the optional step above
+DOCKER_IMAGE=kubespray_github
+# Run this command if you wish to pull the official kubespray Docker image
+DOCKER_IMAGE=quay.io/kubespray/kubespray:latest
+
+CID=$(docker create ${DOCKER_IMAGE}) && \
 docker cp ${CID}:/kubespray/inventory/sample mycluster && \
 docker rm ${CID}
 ```
 
 Make any desired modifications to the files in "mycluster"
 
-### Run deploy
+## Run deploy
 ```bash
 docker run --name kubespray -d -t \
     -v $(pwd)/mycluster:/kubespray/inventory/mycluster \
     -v $(pwd)/ansible/inventories/proxmox.json:/kubespray/inventory/mycluster/proxmox.json \
     -v $(pwd)/ansible/inventories/proxmox.py:/kubespray/inventory/mycluster/proxmox.py \
     -v $HOME/.ssh/id_rsa:/root/.ssh/id_rsa \
-    quay.io/kubespray/kubespray:v2.14.2
+    ${DOCKER_IMAGE}
 
 docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py -i inventory/mycluster/inventory.ini  --user=vagrant --become --become-user=root cluster.yml
 ```
