@@ -1,0 +1,7 @@
+{
+    "url": "https://10.0.128.128:8006/",
+    "username": "root@pam",
+    "password": "this_is_an_example_password",
+    "qemu_interface": "ens18",
+    "validateCert": false
+}
