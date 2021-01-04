@@ -11,7 +11,7 @@
         api_password: "{{ proxmox_details.api_password }}"
         api_host: "{{ proxmox_details.host_ip }}"
         clone: ubuntu-20.04-server
-        name: k8s-kubelet-{{ id }}
+        name: k8s-node-{{ id }}
         node: "{{ proxmox_details.node }}"
         storage: "{{ proxmox_details.storage }}"
       register: new_vm
