@@ -21,7 +21,7 @@ This is a collection of resources to get a Kubernetes cluster up and running in 
     ```
 
 # Packer - Create a VM template
-## Copy the template configuration file
+## Copy the example configuration file
 ```bash
 cp packer/example-variables.json packer/variables.json
 ```
@@ -40,7 +40,7 @@ Workaround for WSL: Install Packer on Windows and run these commands from PowerS
 
 # Ansible - Clone and prepare Kubernetes VMs
 
-## Copy the template configuration files
+## Copy the example configuration files
 ```bash
 cp ansible/group_vars/example-all.yml ansible/group_vars/all.yml
 cp ansible/inventories/example-hosts.yml ansible/inventories/hosts.yml
@@ -57,12 +57,12 @@ ansible-playbook proxmox_k8s_new_master_vm.yml
 # Use a for loop to create multiple systems. Replace the 'X' with the number of VMs you want.
 for i in {1..X} ; do ansible-playbook proxmox_k8s_new_master_vm.yml ; done
 ```
-## Create Kubernetes kubelet VMs
+## Create Kubernetes node VMs
 ```bash
-ansible-playbook proxmox_k8s_new_kubelet_vm.yml
+ansible-playbook proxmox_k8s_new_node_vm.yml
 
 # Use a for loop to create multiple systems. Replace the 'X' with the number of VMs you want.
-for i in {1..X} ; do ansible-playbook proxmox_k8s_new_kubelet_vm.yml ; done
+for i in {1..X} ; do ansible-playbook proxmox_k8s_new_node_vm.yml ; done
 ```
 
 ## Prepare VMs
@@ -79,9 +79,9 @@ ansible-playbook kubespray_create_docker_image.yml
 ```
 ## Copy sample inventory files
 ```bash
-# Run this command if you did the optional step above
+# Run this command if you did the optional step above and wish to use the latest kubespray updates
 DOCKER_IMAGE=kubespray_github
-# Run this command if you wish to pull the official kubespray Docker image
+# Run this command if you wish to use the official kubespray Docker image
 DOCKER_IMAGE=quay.io/kubespray/kubespray:latest
 
 CID=$(docker create ${DOCKER_IMAGE}) && \
@@ -102,7 +102,7 @@ docker run --name kubespray -d -t \
 
 docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py -i inventory/mycluster/inventory.ini  --user=vagrant --become --become-user=root cluster.yml
 ```
-# kubectl - Manager your Kubernetes cluster
+# kubectl - Manager your Kubernetes cluster - WIP
 ### Authorization
 ```bash
 mkdir -p $HOME/.kube
@@ -133,7 +133,7 @@ kubectl get services
 
 kubectl proxy
 ```
-# Etc. - Proxmox CLI cheat sheet
+# Proxmox CLI cheat sheet - Potentially useful commands
 Note: These commands must be run on the Proxmox host as root
 ## Snapshot commands
 ```bash
