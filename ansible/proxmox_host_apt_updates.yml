@@ -3,7 +3,7 @@
   become_user: root
 
   roles:
-  - role: ubuntu_update
+  - role: apt_update
     become: true
     tags:
       - updates
