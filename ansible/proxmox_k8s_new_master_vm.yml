@@ -19,7 +19,7 @@
     - name: Get new VM's id
       set_fact:
         vmid: "{{ new_vm.msg | regex_replace('.*newid ') | regex_replace(' cloned.*') }}"
-    
+
     - name: Start VM
       community.general.proxmox_kvm:
         api_user: "{{ proxmox_details.api_user }}"
@@ -38,3 +38,17 @@
         vmid: "{{ vmid }}"
         description: "{\"groups\": [\"kube-master\", \"etcd\"]}"
         update: true
+
+    - name: Add Proxmox host to inventory
+      add_host:
+        hostname: '{{ proxmox_details.host_ip }}'
+        ansible_port: '{{ proxmox_details.host_ssh_port }}'
+
+    - name: Fix broken VM boot order to not reboot to PXE. Must be run after first VM boot.
+      shell: "qm set {{ vmid }} --boot order=scsi0"
+      vars:
+        ansible_become_password: "{{ proxmox_details.api_password }}"
+      become: yes
+      become_user: root
+      delegate_to: '{{ proxmox_details.host_ip }}'
+      delegate_facts: false
