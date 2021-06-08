@@ -68,15 +68,12 @@
         "sudo apt-get update",
         "sudo apt-get -y upgrade",
         "sudo apt-get -y dist-upgrade",
-        "sudo apt-get -y install linux-generic linux-headers-generic linux-image-generic",
-        "sudo apt-get -y install qemu-guest-agent cloud-init",
-        "sudo apt-get -y install wget curl",
+        "sudo apt-get -y install linux-generic linux-headers-generic linux-image-generic qemu-guest-agent cloud-init wget curl",
         "sudo rm /etc/machine-id",
         "sudo rm /var/lib/dbus/machine-id",
         "sudo truncate -s 0 /etc/machine-id",
         "sudo ln -s /etc/machine-id /var/lib/dbus/machine-id",
         "mkdir -p /home/vagrant/.ssh",
-        "echo 'ssh-rsa YOUR_PUBLIC_KEY_HERE' > /home/vagrant/.ssh/authorized_keys",
         "exit 0"
       ]
     }
