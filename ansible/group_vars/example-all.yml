@@ -2,6 +2,7 @@ ansible_python_interpreter: /usr/bin/python3
 
 proxmox_details:
   host_ip: 10.0.128.128
+  host_ssh_port: 22
   host_url: "https://10.0.128.128:8006/"
   api_user: root@pam
   api_password: this_is_an_example_password
