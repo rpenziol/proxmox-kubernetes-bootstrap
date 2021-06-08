@@ -3,14 +3,14 @@
   become_user: root
   remote_user: vagrant
   become: yes
-  gather_facts: no
+  gather_facts: yes
 
   tasks:
-  - name: Wait for system to become reachable
-    wait_for_connection:
-
-  - name: Gather facts for first time
-    setup:
+  - name: Set authorized key from current user's public SSH key
+    ansible.posix.authorized_key:
+      user: "{{ ansible_user }}"
+      state: present
+      key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/id_rsa.pub') }}"
 
   - name: Disable root login over SSH
     lineinfile: dest=/etc/ssh/sshd_config regexp="^PermitRootLogin" line="PermitRootLogin no" state=present

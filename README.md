@@ -67,12 +67,14 @@ for i in {1..X} ; do ansible-playbook proxmox_k8s_new_node_vm.yml ; done
 
 ## Prepare VMs
 ```bash
-ansible-playbook proxmox_k8s_vm_base_setup.yml
+# Install 'sshpass' dependency needed for password authentication
+sudo apt-get install sshpass -y
+ansible-playbook proxmox_k8s_vm_base_setup.yml -k # Ansible will prompt for a password. The default password defined in Packer is 'vagrant'
 ```
 # Kubespray - Deploy Kubernetes
 
 ## Create kubespray Docker image (Optional)
-Note: This will pull the latest kubespray changes from GitHub, where the official hosted kubespray Docker image may be months old
+Note: This will pull the latest kubespray changes from GitHub, where the official kubespray Docker image may be months old
 ```bash
 # This will take a few minutes
 ansible-playbook kubespray_create_docker_image.yml
