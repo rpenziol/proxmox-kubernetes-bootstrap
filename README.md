@@ -52,6 +52,7 @@ Fill in the `ansible/group_vars/all.yml`, `ansible/inventories/hosts.yml`, and `
 Note: All `ansible-playbook` commands should be run from the 'ansible' directory
 
 ```bash
+cd ansible # All the following steps assume you're in the 'ansible' directory
 ansible-playbook proxmox_k8s_new_master_vm.yml
 
 # Use a for loop to create multiple systems. Replace the 'X' with the number of VMs you want.
@@ -97,8 +98,8 @@ Make any desired modifications to the files in "mycluster"
 ```bash
 docker run --name kubespray -d -t \
     -v $(pwd)/mycluster:/kubespray/inventory/mycluster \
-    -v $(pwd)/ansible/inventories/proxmox.json:/kubespray/inventory/mycluster/proxmox.json \
-    -v $(pwd)/ansible/inventories/proxmox.py:/kubespray/inventory/mycluster/proxmox.py \
+    -v $(pwd)/inventories/proxmox.json:/kubespray/inventory/mycluster/proxmox.json \
+    -v $(pwd)/inventories/proxmox.py:/kubespray/inventory/mycluster/proxmox.py \
     -v $HOME/.ssh/id_rsa:/root/.ssh/id_rsa \
     ${DOCKER_IMAGE}
 
