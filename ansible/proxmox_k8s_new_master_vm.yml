@@ -36,7 +36,7 @@
         api_host: "{{ proxmox_details.host_ip }}"
         node: "{{ proxmox_details.node }}"
         vmid: "{{ vmid }}"
-        description: "{\"groups\": [\"kube-master\", \"etcd\"]}"
+        description: "{\"groups\": [\"kube-master\", \"etcd\", \"k8s_cluster\"]}"
         update: true
 
     - name: Add Proxmox host to inventory

@@ -1,7 +1,7 @@
 - hosts: k8s-cluster
   become_method: sudo
   become_user: root
-  remote_user: vagrant
+  remote_user: ubuntu
   become: yes
   gather_facts: yes
 
@@ -30,11 +30,11 @@
 
   - name: apt updates
     apt:
-        force_apt_get: yes
-        update_cache: yes
-        upgrade: safe
-        autoremove: yes
-        autoclean: yes
+      force_apt_get: yes
+      update_cache: yes
+      upgrade: safe
+      autoremove: yes
+      autoclean: yes
 
   - name: Checking if updates require reboot
     stat:
@@ -51,6 +51,25 @@
       name: nfs-common
       state: present
       update_cache: yes
+    tags:
+      - nfs
+      - never
+
+  - name: Add glusterfs-client PPA
+    ansible.builtin.apt_repository:
+      repo: ppa:gluster/glusterfs-7
+    tags:
+      - glusterfs
+      - never
+
+  - name: Install glusterfs-client
+    apt:
+      name: glusterfs-client
+      state: present
+      update_cache: yes
+    tags:
+      - glusterfs
+      - never
 
   handlers:
   - name: restart sshd

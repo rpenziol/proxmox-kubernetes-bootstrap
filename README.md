@@ -70,7 +70,7 @@ for i in {1..X} ; do ansible-playbook proxmox_k8s_new_node_vm.yml ; done
 ```bash
 # Install 'sshpass' dependency needed for password authentication
 sudo apt-get install sshpass -y
-ansible-playbook proxmox_k8s_vm_base_setup.yml -k # Ansible will prompt for a password. The default password defined in Packer is 'vagrant'
+ansible-playbook proxmox_k8s_vm_base_setup.yml -k # Ansible will prompt for a password. The default password defined in Packer is 'ubuntu'
 ```
 # Kubespray - Deploy Kubernetes
 
@@ -85,7 +85,7 @@ ansible-playbook kubespray_create_docker_image.yml
 # Run this command if you did the optional step above and wish to use the latest kubespray updates
 DOCKER_IMAGE=kubespray_github
 # Run this command if you wish to use the official kubespray Docker image
-DOCKER_IMAGE=quay.io/kubespray/kubespray:latest
+DOCKER_IMAGE=quay.io/kubespray/kubespray:v2.16.0
 
 CID=$(docker create ${DOCKER_IMAGE}) && \
 docker cp ${CID}:/kubespray/inventory/sample mycluster && \
@@ -103,16 +103,17 @@ docker run --name kubespray -d -t \
     -v $HOME/.ssh/id_rsa:/root/.ssh/id_rsa \
     ${DOCKER_IMAGE}
 
-docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py -i inventory/mycluster/inventory.ini  --user=vagrant --become --become-user=root cluster.yml
+docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py --user=ubuntu --become --become-user=root cluster.yml
+docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py --user=ubuntu --become --become-user=root upgrade-cluster.yml -e kube_version=v1.19.7
 ```
 # kubectl - Manager your Kubernetes cluster - WIP
 ### Authorization
 ```bash
 mkdir -p $HOME/.kube
 
-ssh vagrant@10.0.128.252 'mkdir -p $HOME/.kube && sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config'
+ssh ubuntu@10.0.129.175 'mkdir -p $HOME/.kube && sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config'
 
-ssh vagrant@10.0.128.252 'sudo cat $HOME/.kube/config' > $HOME/.kube/config
+ssh ubuntu@10.0.129.175 'sudo cat $HOME/.kube/config' > $HOME/.kube/config
 
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
