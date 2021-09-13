@@ -11,7 +11,7 @@ from optparse import OptionParser
 from six import iteritems
 
 # disable InsecureRequestWarning
-import urllib3
+import urllib3                                              
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
@@ -35,8 +35,10 @@ class ProxmoxVMList(list):
             self.append(ProxmoxVM(item))
 
     def get_names(self):
-        if self.ver >= 4.0:
+        if self.ver >= 4.0 and self.ver < 7.0:
             return [vm['name'] for vm in self if vm['template'] != 1]
+        if self.ver >= 4.0:
+            return [vm['name'] for vm in self if vm['status'] != 'stopped']
         else:
             return [vm['name'] for vm in self]
 
