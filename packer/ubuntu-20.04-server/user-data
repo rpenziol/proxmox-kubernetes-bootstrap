@@ -1,0 +1,34 @@
+#cloud-config
+autoinstall:
+  version: 1
+  locale: en_US
+  keyboard:
+    layout: en
+    variant: us
+  network:
+    network:
+      version: 2
+      ethernets:
+        ens18:
+          dhcp4: true
+          nameservers:
+            addresses: [1.1.1.1, 4.4.4.4, 8.8.8.8]
+  storage:
+    layout:
+      name: direct
+    swap:
+      size: 0
+  identity:
+    hostname: ubuntu
+    username: ubuntu
+    password: $6$rounds=4096$r3B5zBihiCT$jyqdw5g0YW5S95wp5sJc/UNGEdRuWyMothvl9Y9oKv0OH9z2CozfzEObuUglg9hRrxzximcyR90Kc2iffIGXf1
+  ssh:
+    install-server: yes
+    allow-pw: true
+  packages:
+    - qemu-guest-agent
+  user-data:
+    disable_root: false
+  late-commands:
+    - 'sed -i "s/dhcp4: true/&\n      dhcp-identifier: mac/" /target/etc/netplan/00-installer-config.yaml'
+    - echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/ubuntu
