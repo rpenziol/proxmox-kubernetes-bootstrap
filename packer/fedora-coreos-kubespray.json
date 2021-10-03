@@ -1,0 +1,71 @@
+{
+  "variables": {
+    "proxmox_host": null,
+    "proxmox_node": null,
+    "proxmox_api_user": null,
+    "proxmox_api_password": null,
+    "disk_storage_pool": "raid",
+    "iso_storage_pool": "raid",
+    "core_count": "8",
+    "ignition_suffix": "kubespray",
+    "fedora_coreos_iso_url": "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/34.20210821.3.0/x86_64/fedora-coreos-34.20210821.3.0-live.x86_64.iso",
+    "fedora_coreos_iso_checksum": "49e5288595bbd49447cc77b3fba6798b8e4cb21c44c76312cdb8435346a2097b",
+    "fedora_coreos_raw_url": "https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/34.20210821.3.0/x86_64/fedora-coreos-34.20210821.3.0-metal.x86_64.raw.xz"
+  },
+  "sensitive-variables": [
+    "proxmox_api_password"
+  ],
+  "builders": [
+    {
+      "type": "proxmox-iso",
+      "proxmox_url": "https://{{ user `proxmox_host` }}/api2/json",
+      "insecure_skip_tls_verify": true,
+      "username": "{{ user `proxmox_api_user` }}",
+      "password": "{{ user `proxmox_api_password` }}",
+      "http_bind_address": "0.0.0.0",
+      "http_port_min": 8942,
+      "http_port_max": 8942,
+      "template_description": "Fedora CoreOS {{ user `ignition_suffix` }}. Built on {{ isotime \"2006-01-02T15:04:05Z\" }}",
+      "node": "{{user `proxmox_node`}}",
+      "network_adapters": [
+        {
+          "model": "virtio",
+          "bridge": "vmbr0"
+        }
+      ],
+      "disks": [
+        {
+          "type": "scsi",
+          "disk_size": "32G",
+          "storage_pool": "{{ user `disk_storage_pool` }}",
+          "storage_pool_type": "directory",
+          "format": "qcow2"
+        }
+      ],
+      "iso_url": "{{user `fedora_coreos_iso_url`}}",
+      "iso_checksum": "sha256:{{user `fedora_coreos_iso_checksum`}}",
+      "iso_storage_pool": "{{user `iso_storage_pool`}}",
+      "http_directory": "fedora-coreos-server",
+      "unmount_iso": true,
+      "boot": "order=scsi0;ide2",
+      "boot_wait": "5s",
+      "onboot": "true",
+      "qemu_agent": "true",
+      "boot_command": [
+        "<enter>",
+        "<wait30s>",
+        "sudo /usr/bin/coreos-installer install --insecure-ignition -I http://{{ .HTTPIP }}:{{ .HTTPPort }}/ignition-{{ user `ignition_suffix` }}.json -u {{user `fedora_coreos_raw_url`}} /dev/sda && reboot",
+        "<enter>",
+        "<wait1m>"
+      ],
+      "vm_name": "fedora-coreos34-{{ user `ignition_suffix` }}",
+      "memory": "8192",
+      "sockets": "1",
+      "cores": "{{ user `core_count` }}",
+      "os": "l26",
+      "ssh_username": "core",
+      "ssh_private_key_file": "/home/jonas/.ssh/id_rsa",
+      "ssh_timeout": "20m"
+    }
+  ]
+}

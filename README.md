@@ -27,7 +27,22 @@ cp packer/example-variables.json packer/variables.json
 ```
 Fill in the `packer/variables.json` file with values that are appropriate for your environment.
 
+example:
+```
+{
+    "proxmox_host": "192.168.1.220:8006",
+    "proxmox_node": "main-node",
+    "proxmox_api_user": "root@pam",
+    "proxmox_api_password": "mysecretpass"
+}
+```
+
 ## Create your ubuntu-2004-server template
+Visit the [Ubuntu Download page](https://releases.ubuntu.com/20.04/) website and download the latest server live iso.
+Upload it to your iso storage provider.
+
+Review the [user-data](./packer/ubuntu-20.04-server/user-data) configuration.
+
 ```bash
 cd packer  # Note: packer's 'http_directory' is a relative path
 packer build -var-file="variables.json" ubuntu-2004-server.json
@@ -85,7 +100,7 @@ ansible-playbook kubespray_create_docker_image.yml
 # Run this command if you did the optional step above and wish to use the latest kubespray updates
 DOCKER_IMAGE=kubespray_github
 # Run this command if you wish to use the official kubespray Docker image
-DOCKER_IMAGE=quay.io/kubespray/kubespray:v2.16.0
+DOCKER_IMAGE=quay.io/kubespray/kubespray:v2.17.0
 
 CID=$(docker create ${DOCKER_IMAGE}) && \
 docker cp ${CID}:/kubespray/inventory/sample mycluster && \
@@ -111,9 +126,9 @@ docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py --u
 ```bash
 mkdir -p $HOME/.kube
 
-ssh ubuntu@10.0.129.175 'mkdir -p $HOME/.kube && sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config'
+IP=192.168.1.133 ssh ubuntu@${IP} 'mkdir -p $HOME/.kube && sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config'
 
-ssh ubuntu@10.0.129.175 'sudo cat $HOME/.kube/config' > $HOME/.kube/config
+IP=192.168.1.133 ssh ubuntu@${IP} 'sudo cat $HOME/.kube/config' > $HOME/.kube/config
 
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
