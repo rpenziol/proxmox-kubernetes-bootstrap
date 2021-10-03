@@ -1,0 +1,59 @@
+variant: fcos
+version: 1.4.0
+passwd:
+  users:
+    - name: core
+      password_hash: $6$mysalt$gInlfvR5R61K1nUndOdi2TbBwuWdljVSa3DabDNDwoqf4.uNbmBhJ2obbwekZ.vJ4hZW.O2tf4ItAEnjw1gvD0
+      ssh_authorized_keys:
+        - "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDRB3PGNkKo2WS4e40jFR3wGg6Eu3ZxwfoSbClAPj2tu4HFUdDoe+hH+peAhdF6Khrv/20pK1Va8IDdJTYzWXNNBwiq+GC0SFvurJVUFJ+Dt3UJAfs1il+/BZeMCZLCjOKKirlAH48bEPoc4SSuG0Lcia2NHJbkcJ4vfH4hsN8H8I3QJY5+eT//HjfkXVgphonh1sKCKJvMPf8mCw1jJrqJ87fEnxNM7FooqV5+IUxoIJ1PHsZKijohSz/e2hsZJy/XpQYIh6S10lzEYli1xvjhOX4t5yKGjM+x9BXVxg0SnKeCV4i/VN2t7sQxlBUxXK/T1vqit2NokH/45+YQtsyMKw3TOdJ4ukLI6PVnBV3PukPowR11XqvtEAUxCFLY/42IH8f+nnhEMiKOAMTdG3zsY0eplJwJXmz3gzHGLieKYyVXbKzAZ3k13HH/W6q6IyQd47Owra8NnKrvWJqD14NT4uQvptS5qsohu5oJGvJJJY6mltA8vT8SV9v1L1LxU/lchem8ynV2qoKDtrnW5cuegG0RyjGGbHKpo4xArPIZXqSjPRO4UxofwP8g7EbUNLPTQNV7Ng3WACNRX7z76GjSc/aZW1zrwO1qqXa2Ek51dAJXbSyxUZqIbGv9ad/RbCnxOE2e1dbgsirPAL0Xp5fTh6i4aSiJ6MNLa1zpjZkdcQ=="
+      groups:
+        - wheel
+        - sudo
+storage:
+  files:
+    - path: /etc/sysctl.d/reverse-path-filter.conf
+      contents:
+        inline: |
+          net.ipv4.conf.all.rp_filter=1
+    - path: /etc/locale.conf
+      mode: 0644
+      contents:
+        inline: |
+          LANG=de_DE.UTF-8
+          LC_MESSAGES=C
+    # https://github.com/coreos/fedora-coreos-docs/blob/master/modules/ROOT/pages/faq.adoc#why-does-ssh-stop-working-after-upgrading-to-fedora-33
+    - path: /etc/ssh/sshd_config.d/10-insecure-rsa-keysig.conf
+      mode: 0600
+      contents:
+        inline: |
+          PubkeyAcceptedKeyTypes=+ssh-rsa
+
+systemd:
+  units:
+    - name: rpm-ostree-install-kube-dependencies.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Layer kube dependencies with rpm-ostree
+        # We run after `systemd-machine-id-commit.service` to ensure that
+        # `ConditionFirstBoot=true` services won't rerun on the next boot.
+        After=systemd-machine-id-commit.service
+        After=network-online.target
+        # We run before `zincati.service` to avoid conflicting rpm-ostree
+        # transactions.
+        Before=zincati.service
+        ConditionPathExists=!/var/lib/kube-prereq.stamp
+        OnFailure=emergency.target
+        OnFailureJobMode=replace-irreversibly
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/bin/rpm-ostree install --allow-inactive python python3-libselinux ethtool ipset conntrack-tools qemu-guest-agent
+        ExecStart=/bin/touch /var/lib/kube-prereq.stamp
+        ExecStart=/bin/systemctl --no-block reboot
+        StandardOutput=kmsg+console
+        StandardError=kmsg+console
+
+        [Install]
+        WantedBy=multi-user.target

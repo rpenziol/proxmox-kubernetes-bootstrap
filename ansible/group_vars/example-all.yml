@@ -1,5 +1,7 @@
 ansible_python_interpreter: /usr/bin/python3
 
+proxmox_template_name: ubuntu-20.04-server
+
 proxmox_details:
   host_ip: 10.0.128.128
   host_ssh_port: 22
