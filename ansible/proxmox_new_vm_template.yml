@@ -9,43 +9,65 @@
   tasks:
   - name: Download Ubuntu cloud image
     get_url:
-      url: https://cloud-images.ubuntu.com/minimal/releases/focal/release/ubuntu-20.04-minimal-cloudimg-amd64.img
-      dest: /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04-minimal-cloudimg-amd64.img
+      url: https://releases.ubuntu.com/20.04/ubuntu-20.04.3-live-server-amd64.iso
+      dest: /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04.3-live-server-amd64.iso
 
   - name: Install PVE server dependencies
     pip:
       name: proxmoxer
 
-  - name: Create new VM using cloud-init with a username and password
+  - name: Get new VM's id
+    set_fact:
+      vmid: 9001
+
+  - name: Create new VM
+    shell: |
+      qm create {{ vmid }} --memory 2048 --net0 virtio,bridge=vmbr0
+
+  - name: Convert cloud image to disk
+    shell: |
+      qm importdisk {{ vmid }} /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04-minimal-cloudimg-amd64.img raid
+
+  - name: Assign to to SCSi drive on VM
+    shell: |
+      qm set {{ vmid }} --scsihw virtio-scsi-pci --scsi0 {{ raid_name }}:{{ vmid }}/vm-{{ vmid }}-disk-0.raw
+
+  - name: Create Cloud-init drive
+    shell: |
+      qm set {{ vmid }} --ide2 {{ raid_name }}:cloudinit
+
+  - name: Set boot priority
+    shell: |
+      qm set {{ vmid }} --boot c --bootdisk scsi0
+
+  - name: Set boot priority
+    shell: |
+      qm set {{ vmid }} --serial0 socket --vga serial0
+
+  - name: Set Cloud-init config file
+    ansible.builtin.copy:
+      dest: /mnt/pve/{{ raid_name }}/snippets/user-config.yml
+      content: |
+        #cloud-config
+        hostname: ubuntu2004server
+        manage_etc_hosts: true
+        user: ubuntu
+        password: ubuntu
+        chpasswd:
+          expire: False
+        users:
+          - default
+        package_upgrade: true
+
+  - name: Assign to to SCSi drive on VM
+    shell: |
+      qm set {{ vmid }} --cicustom "user={{ raid_name }}:snippets/user-config.yml"
+
+  - name: Start VM
     community.general.proxmox_kvm:
-      node: "{{ proxmox_details.node }}"
       api_user: "{{ proxmox_details.api_user }}"
       api_password: "{{ proxmox_details.api_password }}"
       api_host: "{{ proxmox_details.host_ip }}"
-      name: afsddfas
-      boot: c
-      bootdisk: scsi0
-      ide:
-        ide2: 'local:cloudinit,format=qcow2'
-      ciuser: mylinuxuser
-      cipassword: supersecret
-      searchdomains: 'mydomain.internal'
-      nameservers: 1.1.1.1
-      net:
-        net0: 'virtio,bridge=vmbr0,tag=77'
-      ipconfig:
-        ipconfig0: 'ip=192.168.1.1/24,gw=192.168.1.1'
-    register: new_vm
-
-  - name: Get new VM's id
-    set_fact:
-      vmid: "{{ new_vm.vmid }}"
-
-  - name: Import the new disk
-    ansible.builtin.shell: qm importdisk {{ vmid }} /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04-minimal-cloudimg-amd64.img {{ raid_name }} -format qcow2
-
-  - name: Mount the new disk
-    ansible.builtin.shell: qm set {{ vmid }} --scsihw virtio-scsi-pci --scsi0 /mnt/pve/raid/images/{{ vmid }}/vm-{{ vmid }}-disk-0.qcow2
-
-  - name: Expand the new disk
-    ansible.builtin.shell: qm resize {{ vmid }} scsi0 +30G
+      node: "{{ proxmox_details.node }}"
+      vmid: "{{ vmid }}"
+      state: started
