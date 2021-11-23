@@ -65,28 +65,21 @@
         package_upgrade: true
         packages:
           - qemu-guest-agent
-
-  - name: Set Cloud-init network config file
-    ansible.builtin.copy:
-      dest: /mnt/pve/{{ raid_name }}/snippets/network-config.yml
-      content: |
-        #cloud-config
-        version: 1
-        config:
-            - type: physical
-              name: eth0
-              subnets:
-              - type: dhcp4
-            - type: nameserver
-              address:
-              - '1.1.1.1'
-              - '8.8.8.8'
-              search:
-              - 'localdomain'
+        runcmd:
+          - sudo rm /etc/machine-id
+          - sudo rm /var/lib/dbus/machine-id
+          - sudo truncate -s 0 /etc/machine-id
+          - sudo ln -s /etc/machine-id /var/lib/dbus/machine-id
+          - mkdir -p /home/ubuntu/.ssh
+          - reboot
 
   - name: Assign to to SCSi drive on VM
     shell: |
       qm set {{ vmid }} --ipconfig0 ip=dhcp
+      
+  - name: Enable QEMU Guest Agent
+    shell: |
+      qm set {{ vmid }} --agent 1
 
   - name: Assign to to SCSi drive on VM
     shell: |
