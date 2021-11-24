@@ -11,13 +11,14 @@
     get_url:
       url: https://releases.ubuntu.com/20.04/ubuntu-20.04.3-live-server-amd64.iso
       dest: /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04.3-live-server-amd64.iso
+      checksum: sha256:https://releases.ubuntu.com/20.04/SHA256SUMS
 
   - name: Install PVE server dependencies
     pip:
       name: proxmoxer
 
   - name: Get next VMID
-    shell: |
+    ansible.builtin.shell: |
       pvesh get /cluster/nextid
     register: next_vmid
   
@@ -26,27 +27,27 @@
       vmid: "{{ next_vmid.stdout }}"
 
   - name: Create new VM
-    shell: |
-      qm create {{ vmid }} --memory 8096 --net0 virtio,bridge=vmbr0
+    ansible.builtin.shell: |
+      qm create {{ vmid }} --name ubuntu-20.04-server --memory 8096 --net0 virtio,bridge=vmbr0
 
   - name: Convert cloud image to disk
-    shell: |
+    ansible.builtin.shell: |
       qm importdisk {{ vmid }} /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04-minimal-cloudimg-amd64.img {{ raid_name }}
 
   - name: Assign to to SCSi drive on VM
-    shell: |
+    ansible.builtin.shell: |
       qm set {{ vmid }} --scsihw virtio-scsi-pci --scsi0 {{ raid_name }}:{{ vmid }}/vm-{{ vmid }}-disk-0.raw
 
   - name: Create Cloud-init drive
-    shell: |
+    ansible.builtin.shell: |
       qm set {{ vmid }} --ide2 {{ raid_name }}:cloudinit
 
   - name: Set boot priority
-    shell: |
+    ansible.builtin.shell: |
       qm set {{ vmid }} --boot c --bootdisk scsi0
 
   - name: Set VGA output
-    shell: |
+    ansible.builtin.shell: |
       qm set {{ vmid }} --serial0 socket --vga serial0
 
   - name: Set Cloud-init config file
@@ -54,7 +55,7 @@
       dest: /mnt/pve/{{ raid_name }}/snippets/user-config.yml
       content: |
         #cloud-config
-        hostname: ubuntu2004server
+        hostname: ubuntu2004
         manage_etc_hosts: true
         user: ubuntu
         password: ubuntu
@@ -71,25 +72,32 @@
           - sudo truncate -s 0 /etc/machine-id
           - sudo ln -s /etc/machine-id /var/lib/dbus/machine-id
           - mkdir -p /home/ubuntu/.ssh
-          - reboot
+          - shutdown
 
   - name: Assign to to SCSi drive on VM
-    shell: |
+    ansible.builtin.shell: |
       qm set {{ vmid }} --ipconfig0 ip=dhcp
       
   - name: Enable QEMU Guest Agent
-    shell: |
+    ansible.builtin.shell: |
       qm set {{ vmid }} --agent 1
 
   - name: Assign to to SCSi drive on VM
-    shell: |
+    ansible.builtin.shell: |
       qm set {{ vmid }} --cicustom "user={{ raid_name }}:snippets/user-config.yml"
 
   - name: Start VM
-    community.general.proxmox_kvm:
-      api_user: "{{ proxmox_details.api_user }}"
-      api_password: "{{ proxmox_details.api_password }}"
-      api_host: "{{ proxmox_details.host_ip }}"
-      node: "{{ proxmox_details.node }}"
-      vmid: "{{ vmid }}"
-      state: started
+    ansible.builtin.shell: |
+      qm start {{ vmid }} 
+
+  - name: Wait for VM setup to complete
+    ansible.builtin.shell: |
+      qm status {{ vmid }} 
+    register: vm_status
+    retries: 25
+    delay: 10
+    until: '"stopped" in vm_status.stdout'
+
+  - name: Convert VM to template
+    ansible.builtin.shell: |
+      qm template {{ vmid }}
