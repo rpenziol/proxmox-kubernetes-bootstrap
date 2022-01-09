@@ -28,7 +28,7 @@
 
   - name: Create new VM
     ansible.builtin.shell: |
-      qm create {{ vmid }} --name ubuntu-20.04-server --memory 8096 --net0 virtio,bridge=vmbr0
+      qm create {{ vmid }} --name {{ proxmox_template_name }} --memory 8096 --net0 virtio,bridge=vmbr0
 
   - name: Convert cloud image to disk
     ansible.builtin.shell: |
