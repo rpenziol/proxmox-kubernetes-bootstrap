@@ -7,7 +7,6 @@ This is a collection of resources to get a Kubernetes cluster up and running in 
 * A set of RSA SSH keys generated
 * Install Python 3
 * [Install Docker](https://github.com/docker/docker-install#usage)
-* [Install Packer](https://learn.hashicorp.com/tutorials/packer/getting-started-install) 1.6.6 or newer
 * Install Ansible and its dependencies
 
     ```bash
@@ -20,50 +19,27 @@ This is a collection of resources to get a Kubernetes cluster up and running in 
     ansible-galaxy install -r ansible/requirements.yml
     ```
 
-# Packer - Create a VM template
-## Copy the example configuration file
-```bash
-cp packer/example-variables.json packer/variables.json
-```
-Fill in the `packer/variables.json` file with values that are appropriate for your environment.
-
-example:
-```
-{
-    "proxmox_host": "192.168.1.220:8006",
-    "proxmox_node": "main-node",
-    "proxmox_api_user": "root@pam",
-    "proxmox_api_password": "mysecretpass"
-}
-```
+# Create a VM template
 
 ## Create your ubuntu-2004-server template
-Visit the [Ubuntu Download page](https://releases.ubuntu.com/20.04/) website and download the latest server live iso.
-Upload it to your iso storage provider.
-
-Review the [user-data](./packer/ubuntu-20.04-server/user-data) configuration.
 
 ```bash
-cd packer  # Note: packer's 'http_directory' is a relative path
-packer build -var-file="variables.json" ubuntu-2004-server.json
+cd ansible # All the following steps assume you're in the 'ansible' directory
+ansible-playbook proxmox_new_vm_template.yml -K
 ```
-Expect the installation to take a little over 10 minutes. This time may vary depending on your hardware specs and network performance.
 
-Note: Packer may fail if the VM doesn't have access to the same network as your local machine. (e.g. WSL on Windows or a non-flat network environment)
-
-Workaround for WSL: Install Packer on Windows and run these commands from PowerShell or CMD
-
-# Ansible - Clone and prepare Kubernetes VMs
+# Clone and prepare Kubernetes VMs
 
 ## Copy the example configuration files
 ```bash
+# From the repo's root path
 cp ansible/group_vars/example-all.yml ansible/group_vars/all.yml
 cp ansible/inventories/example-hosts.yml ansible/inventories/hosts.yml
 cp ansible/inventories/example-proxmox.json ansible/inventories/proxmox.json
 ```
 Fill in the `ansible/group_vars/all.yml`, `ansible/inventories/hosts.yml`, and `ansible/inventories/proxmox.json` files with values that are appropriate for your environment.
 
-## Create Kubernetes master VMs
+## Create Kubernetes control plane VMs
 Note: All `ansible-playbook` commands should be run from the 'ansible' directory
 
 ```bash
@@ -83,9 +59,9 @@ for i in {1..X} ; do ansible-playbook proxmox_k8s_new_node_vm.yml ; done
 
 ## Prepare VMs
 ```bash
-# Install 'sshpass' dependency needed for password authentication
+# Install 'sshpass' dependency locally for password authentication
 sudo apt-get install sshpass -y
-ansible-playbook proxmox_k8s_vm_base_setup.yml -k # Ansible will prompt for a password. The default password defined in Packer is 'ubuntu'
+ansible-playbook proxmox_k8s_vm_base_setup.yml -k # Ansible will prompt for a password. The default password defined in the template is 'ubuntu'
 ```
 # Kubespray - Deploy Kubernetes
 
@@ -126,9 +102,11 @@ docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py --u
 ```bash
 mkdir -p $HOME/.kube
 
-IP=192.168.1.133 ssh ubuntu@${IP} 'mkdir -p $HOME/.kube && sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config'
+IP=192.168.1.133  # Master node IP address
 
-IP=192.168.1.133 ssh ubuntu@${IP} 'sudo cat $HOME/.kube/config' > $HOME/.kube/config
+ssh ubuntu@${IP} 'mkdir -p $HOME/.kube && sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config'
+
+ssh ubuntu@${IP} 'sudo cat $HOME/.kube/config' > $HOME/.kube/config
 
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
