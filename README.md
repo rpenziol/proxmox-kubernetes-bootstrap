@@ -4,10 +4,9 @@
 This is a collection of resources to get a Kubernetes cluster up and running in a Proxmox Virtual Environment. These tools and commands assume the user is executing in a Linux or Linux-like environment.
 # Prerequisites
 * Proxmox 6 or newer server up and running
-* A set of RSA SSH keys generated
+* A set of RSA SSH keys generated (Specifically, a public key located at `$HOME/.ssh/id_rsa.pub`)
 * Install Python 3
 * [Install Docker](https://github.com/docker/docker-install#usage)
-* [Install Packer](https://learn.hashicorp.com/tutorials/packer/getting-started-install) 1.6.6 or newer
 * Install Ansible and its dependencies
 
     ```bash
@@ -20,76 +19,58 @@ This is a collection of resources to get a Kubernetes cluster up and running in 
     ansible-galaxy install -r ansible/requirements.yml
     ```
 
-# Packer - Create a VM template
-## Copy the example configuration file
-```bash
-cp packer/example-variables.json packer/variables.json
-```
-Fill in the `packer/variables.json` file with values that are appropriate for your environment.
+# Create a VM template
 
-example:
-```
-{
-    "proxmox_host": "192.168.1.220:8006",
-    "proxmox_node": "main-node",
-    "proxmox_api_user": "root@pam",
-    "proxmox_api_password": "mysecretpass"
-}
-```
-
-## Create your ubuntu-2004-server template
-Visit the [Ubuntu Download page](https://releases.ubuntu.com/20.04/) website and download the latest server live iso.
-Upload it to your iso storage provider.
-
-Review the [user-data](./packer/ubuntu-20.04-server/user-data) configuration.
-
-```bash
-cd packer  # Note: packer's 'http_directory' is a relative path
-packer build -var-file="variables.json" ubuntu-2004-server.json
-```
-Expect the installation to take a little over 10 minutes. This time may vary depending on your hardware specs and network performance.
-
-Note: Packer may fail if the VM doesn't have access to the same network as your local machine. (e.g. WSL on Windows or a non-flat network environment)
-
-Workaround for WSL: Install Packer on Windows and run these commands from PowerShell or CMD
-
-# Ansible - Clone and prepare Kubernetes VMs
 
 ## Copy the example configuration files
 ```bash
+# From the repo's root path
 cp ansible/group_vars/example-all.yml ansible/group_vars/all.yml
 cp ansible/inventories/example-hosts.yml ansible/inventories/hosts.yml
 cp ansible/inventories/example-proxmox.json ansible/inventories/proxmox.json
 ```
 Fill in the `ansible/group_vars/all.yml`, `ansible/inventories/hosts.yml`, and `ansible/inventories/proxmox.json` files with values that are appropriate for your environment.
-
-## Create Kubernetes master VMs
-Note: All `ansible-playbook` commands should be run from the 'ansible' directory
+## Create your ubuntu-2004-server template
 
 ```bash
-cd ansible # All the following steps assume you're in the 'ansible' directory
-ansible-playbook proxmox_k8s_new_master_vm.yml
+cd ansible # All the following steps assume you're in the 'ansible' directory. Ansible is directory dependant.
+ansible-playbook proxmox_new_vm_template.yml -K
+```
 
-# Use a for loop to create multiple systems. Replace the 'X' with the number of VMs you want.
-for i in {1..X} ; do ansible-playbook proxmox_k8s_new_master_vm.yml ; done
+# Clone and prepare Kubernetes VMs
+
+## Create Kubernetes control plane VMs
+Note: All `ansible-playbook` commands should be run from the 'ansible' directory. Ansible is directory dependant.
+
+```bash
+# Use a for loop to create multiple systems. Set NUM_CONTROL_PLANE equal to the number of VMs you want.
+#
+# Minimum required: 1
+# Kubespray requires an odd number of control plane nodes.
+NUM_CONTROL_PLANE=1
+for i in {1..${NUM_CONTROL_PLANE}} ; do ansible-playbook proxmox_k8s_new_master_vm.yml ; done
 ```
 ## Create Kubernetes node VMs
 ```bash
-ansible-playbook proxmox_k8s_new_node_vm.yml
-
-# Use a for loop to create multiple systems. Replace the 'X' with the number of VMs you want.
-for i in {1..X} ; do ansible-playbook proxmox_k8s_new_node_vm.yml ; done
+# Use a for loop to create multiple systems. Set NUM_NODES equal to the number of VMs you want.
+#
+# Minimum required: 1
+NUM_NODES=1
+for i in {1..${NUM_NODES}} ; do ansible-playbook proxmox_k8s_new_node_vm.yml ; done
 ```
 
 ## Prepare VMs
 ```bash
-# Install 'sshpass' dependency needed for password authentication
+# Install 'sshpass' dependency locally for password authentication.
 sudo apt-get install sshpass -y
-ansible-playbook proxmox_k8s_vm_base_setup.yml -k # Ansible will prompt for a password. The default password defined in Packer is 'ubuntu'
+
+ansible-playbook proxmox_vms_start_all.yml # Start all VMs. They automatically shutdown after being cloned.
+
+ansible-playbook proxmox_k8s_vm_base_setup.yml -k # Ansible will prompt for a password. The default password defined in the template is 'ubuntu'
 ```
 # Kubespray - Deploy Kubernetes
 
-## Create kubespray Docker image (Optional)
+## (Optional, not recommended) Create kubespray Docker image
 Note: This will pull the latest kubespray changes from GitHub, where the official kubespray Docker image may be months old
 ```bash
 # This will take a few minutes
@@ -97,13 +78,13 @@ ansible-playbook kubespray_create_docker_image.yml
 ```
 ## Copy sample inventory files
 ```bash
-# Run this command if you did the optional step above and wish to use the latest kubespray updates
+# Run this command if you did the optional step above and wish to use the latest kubespray updates (not recommended)
 DOCKER_IMAGE=kubespray_github
-# Run this command if you wish to use the official kubespray Docker image
-DOCKER_IMAGE=quay.io/kubespray/kubespray:v2.17.0
+# Run this command if you wish to use the official kubespray Docker image (recommended)
+DOCKER_IMAGE=quay.io/kubespray/kubespray:v2.18.0
 
-CID=$(docker create ${DOCKER_IMAGE}) && \
-docker cp ${CID}:/kubespray/inventory/sample mycluster && \
+CID=$(docker create ${DOCKER_IMAGE})
+docker cp ${CID}:/kubespray/inventory/sample mycluster
 docker rm ${CID}
 ```
 
@@ -119,16 +100,17 @@ docker run --name kubespray -d -t \
     ${DOCKER_IMAGE}
 
 docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py --user=ubuntu --become --become-user=root cluster.yml
-docker exec -it kubespray ansible-playbook -i inventory/mycluster/proxmox.py --user=ubuntu --become --become-user=root upgrade-cluster.yml -e kube_version=v1.19.7
 ```
 # kubectl - Manager your Kubernetes cluster - WIP
 ### Authorization
 ```bash
 mkdir -p $HOME/.kube
 
-IP=192.168.1.133 ssh ubuntu@${IP} 'mkdir -p $HOME/.kube && sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config'
+IP=192.168.1.133  # Master node IP address
 
-IP=192.168.1.133 ssh ubuntu@${IP} 'sudo cat $HOME/.kube/config' > $HOME/.kube/config
+ssh ubuntu@${IP} 'mkdir -p $HOME/.kube && sudo cp -f /etc/kubernetes/admin.conf $HOME/.kube/config'
+
+ssh ubuntu@${IP} 'sudo cat $HOME/.kube/config' > $HOME/.kube/config
 
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
