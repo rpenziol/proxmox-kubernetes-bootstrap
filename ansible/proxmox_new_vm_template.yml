@@ -9,9 +9,9 @@
   tasks:
   - name: Download Ubuntu cloud image
     get_url:
-      url: https://releases.ubuntu.com/20.04/ubuntu-20.04.3-live-server-amd64.iso
-      dest: /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04.3-live-server-amd64.iso
-      checksum: sha256:https://releases.ubuntu.com/20.04/SHA256SUMS
+      url: https://cloud-images.ubuntu.com/minimal/releases/focal/release/ubuntu-20.04-minimal-cloudimg-amd64.img
+      dest: /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04-minimal-cloudimg-amd64.img
+      checksum: sha256:https://cloud-images.ubuntu.com/minimal/releases/focal/release/SHA256SUMS
 
   - name: Install PVE server dependencies
     pip:
@@ -21,7 +21,7 @@
     ansible.builtin.shell: |
       pvesh get /cluster/nextid
     register: next_vmid
-  
+
   - name: Set VMID
     set_fact:
       vmid: "{{ next_vmid.stdout }}"
@@ -78,7 +78,7 @@
   - name: Assign to to SCSi drive on VM
     ansible.builtin.shell: |
       qm set {{ vmid }} --ipconfig0 ip=dhcp
-      
+
   - name: Enable QEMU Guest Agent
     ansible.builtin.shell: |
       qm set {{ vmid }} --agent 1
@@ -89,11 +89,11 @@
 
   - name: Start VM
     ansible.builtin.shell: |
-      qm start {{ vmid }} 
+      qm start {{ vmid }}
 
   - name: Wait for VM setup to complete
     ansible.builtin.shell: |
-      qm status {{ vmid }} 
+      qm status {{ vmid }}
     register: vm_status
     retries: 25
     delay: 10
