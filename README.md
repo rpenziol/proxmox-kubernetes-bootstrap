@@ -95,7 +95,7 @@ ansible-playbook kubespray_create_docker_image.yml
 # Run this command if you did the optional step above and wish to use the latest kubespray updates (not recommended)
 DOCKER_IMAGE=kubespray_github
 # Run this command if you wish to use the official kubespray Docker image (recommended)
-DOCKER_IMAGE=quay.io/kubespray/kubespray:v2.18.0
+DOCKER_IMAGE=quay.io/kubespray/kubespray:v2.19.1
 
 CID=$(docker create ${DOCKER_IMAGE})
 docker cp ${CID}:/kubespray/inventory/sample mycluster
