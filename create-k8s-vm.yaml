@@ -1,0 +1,32 @@
+- hosts: proxmox
+  become_method: sudo
+  become_user: root
+  become: true
+
+  tasks:
+  - name: Get template VM id
+    ansible.builtin.shell: |
+      qm list | grep "{{ proxmox_template_name }}" | awk '{ print $1 }'
+    register: template_vm_id
+
+  - name: Get next VMID
+    ansible.builtin.shell: |
+      pvesh get /cluster/nextid
+    register: next_vmid
+
+  - ansible.builtin.set_fact:
+      id: "{{ range(10000, 99999) | random }}"
+
+  - name: Clone template VM
+    ansible.builtin.shell: |
+      qm clone "{{ template_vm_id.stdout }}" "{{ next_vmid.stdout }}" \
+        --name "k8s-controller-{{ id }}"
+
+  - name: Set VM tags
+    ansible.builtin.shell: |
+      qm set "{{ next_vmid.stdout }}" \
+        --tags "kube-master,etcd,k8s_cluster"
+
+  - name: Start VM
+    ansible.builtin.shell: |
+      qm start "{{ next_vmid.stdout }}"
