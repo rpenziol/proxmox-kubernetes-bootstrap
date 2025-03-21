@@ -1,0 +1,6 @@
+proxmox_ip_address: 192.0.1.1
+proxmox_username: root@pam
+proxmox_password: password
+proxmox_ssh_port: 22
+proxmox_https_port: 8006
+proxmox_trust_invalid_https_certs: true
