@@ -1,4 +1,0 @@
-ansible
-docker
-proxmoxer
-requests

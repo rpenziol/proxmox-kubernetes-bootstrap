@@ -1,8 +1,2 @@
-.vscode
-mycluster
-packer_cache
-packer/variables.json
-ansible/group_vars/all.yml
-ansible/inventories/hosts.yml
-ansible/inventories/proxmox.json
-packer/fedora-coreos-server/**.json
+group_vars/all.yaml
+mycluster/

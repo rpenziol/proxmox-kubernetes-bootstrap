@@ -1,0 +1,161 @@
+- hosts: proxmox
+  become_method: sudo
+  become_user: root
+  become: true
+
+  tasks:
+  - name: Get local SSH public key
+    ansible.builtin.shell: |
+      ssh-agent sh -c 'ssh-add > /dev/null 2>&1 ; ssh-add -L'
+    register: ssh_public_key
+    become: false
+    delegate_to: localhost
+  
+  - name: Set SSH public key
+    ansible.builtin.set_fact:
+      ssh_public_key: "{{ ssh_public_key.stdout }}"
+
+  - name: Determine ISO download path
+    ansible.builtin.shell: |
+      pvesh get /storage/{{ proxmox_iso_storage }} --output-format json
+    register: iso_storage
+
+  - name: Set ISO download path
+    ansible.builtin.set_fact:
+      iso_path: "{{ (iso_storage.stdout | from_json).path }}/template/iso"
+
+  - name: Download Ubuntu cloud image
+    ansible.builtin.get_url:
+      url: https://cloud-images.ubuntu.com/minimal/releases/noble/release/ubuntu-24.04-minimal-cloudimg-amd64.img
+      dest: "{{ iso_path }}/ubuntu-24.04-minimal-cloudimg-amd64.img"
+      checksum: sha256:https://cloud-images.ubuntu.com/minimal/releases/noble/release/SHA256SUMS
+
+  - name: Generate VM name
+    ansible.builtin.shell: |
+      echo "k8s-node-$(tr -dc a-z0-9 </dev/urandom | head -c 5)"
+    register: vm_name
+  
+  - name: Set VM name
+    ansible.builtin.set_fact:
+      vm_name: "{{ vm_name.stdout }}"
+
+  - name: Get next VMID
+    ansible.builtin.shell: |
+      pvesh get /cluster/nextid
+    register: next_vmid
+
+  - name: Set VMID
+    ansible.builtin.set_fact:
+      vmid: "{{ next_vmid.stdout }}"
+
+  - name: Create new VM
+    ansible.builtin.shell: |
+      qm create {{ vmid }} \
+        --agent 1 \
+        --cores {{ vm_cores }} \
+        --ipconfig0 ip=dhcp \
+        --memory {{ vm_memory }} \
+        --name {{ vm_name }} \
+        --net0 virtio,bridge=vmbr0 \
+        --serial0 socket \
+        --tags "{{ vm_tags }}" \
+        --vga serial0
+
+  - name: Convert cloud image to disk
+    ansible.builtin.shell: |
+      qm importdisk {{ vmid }} "{{ iso_path }}/ubuntu-24.04-minimal-cloudimg-amd64.img" {{ proxmox_disk_storage }}
+    register: disk_location
+
+  - name: Set disk location
+    ansible.builtin.shell: |
+      echo "{{ disk_location.stdout }}" | tail -n 1 | grep -o -E "'.*'" | sed "s/'//g" | sed 's/unused[0-9]*://g'
+    register: disk_location
+
+  - name: Assign to to SCSi drive on VM
+    ansible.builtin.shell: |
+      qm set {{ vmid }} --scsihw virtio-scsi-pci --scsi0 {{ disk_location.stdout }}
+
+  - name: Resize disk
+    ansible.builtin.shell: |
+      qm resize {{ vmid }} scsi0 {{ vm_disk_size }}
+
+  - name: Set boot priority
+    ansible.builtin.shell: |
+      qm set {{ vmid }} --boot c --bootdisk scsi0
+
+  - name: Enable snippets
+    ansible.builtin.shell: |
+      pvesm set {{ proxmox_snippet_storage }} --content images,rootdir,vztmpl,backup,iso,snippets
+
+  - name: Create cloud-init drive
+    ansible.builtin.shell: |
+      qm set {{ vmid }} --scsi1 {{ proxmox_snippet_storage }}:cloudinit
+
+  - name: Determine snippets path
+    ansible.builtin.shell: |
+      pvesh get /storage/{{ proxmox_snippet_storage }} --output-format json
+    register: snippets_storage
+
+  - name: Set ISO download path
+    ansible.builtin.set_fact:
+      snippets_path: "{{ (snippets_storage.stdout | from_json).path }}/snippets"
+
+  - name: Set cloud-init config file
+    ansible.builtin.copy:
+      dest: "{{ snippets_path }}/{{ vm_name }}-config.yaml"
+      content: |
+        #cloud-config
+        hostname: {{ vm_name }}
+        manage_etc_hosts: true
+        user: {{ vm_user }}
+        password: {{ vm_password }}
+        chpasswd:
+          expire: False
+        ssh_authorized_keys:
+          - {{ ssh_public_key }}
+        users:
+          - default
+        package_upgrade: true
+        packages:
+          - qemu-guest-agent
+        runcmd:
+          - sudo sed -i 's/^[# ]*PasswordAuthentication .*/PasswordAuthentication no/g' /etc/ssh/sshd_config
+          - sudo sed -i 's/^[# ]*PermitRootLogin .*/PermitRootLogin no/g' /etc/ssh/sshd_config
+          - sudo rm /etc/machine-id
+          - sudo rm /var/lib/dbus/machine-id
+          - sudo truncate -s 0 /etc/machine-id
+          - sudo ln -s /etc/machine-id /var/lib/dbus/machine-id
+          - shutdown
+
+  - name: Mount cloud-init file
+    ansible.builtin.shell: |
+      qm set {{ vmid }} --cicustom "user={{ proxmox_snippet_storage }}:snippets/{{ vm_name }}-config.yaml"
+
+  - name: Start VM
+    ansible.builtin.shell: |
+      qm start {{ vmid }}
+
+  - name: Wait for VM setup to complete
+    ansible.builtin.shell: |
+      qm status {{ vmid }}
+    register: vm_status
+    retries: 50
+    delay: 10
+    until: '"stopped" in vm_status.stdout'
+
+  - name: Unmount cloud-init drive
+    ansible.builtin.shell: |
+      qm disk unlink {{ vmid }} --idlist scsi1
+
+  - name: Clean up cloud-init file
+    ansible.builtin.file:
+      path: "{{ snippets_path }}/{{ vm_name }}-config.yaml"
+      state: absent
+
+  - name: Snapshot VM
+    ansible.builtin.shell: |
+      qm snapshot {{ vmid }} base
+
+  - name: Start VM
+    ansible.builtin.shell: |
+      qm start {{ vmid }}

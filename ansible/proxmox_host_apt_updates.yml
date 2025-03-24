@@ -1,9 +1,0 @@
-- hosts: physical
-  become_method: sudo
-  become_user: root
-
-  roles:
-  - role: apt_update
-    become: true
-    tags:
-      - updates
