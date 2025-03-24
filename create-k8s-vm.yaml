@@ -25,20 +25,20 @@
     ansible.builtin.set_fact:
       ssh_public_key: "{{ ssh_public_key.stdout }}"
 
+  - name: Determine ISO download path
+    ansible.builtin.shell: |
+      pvesh get /storage/{{ proxmox_iso_storage }} --output-format json
+    register: iso_path
+
+  - name: Set ISO download path
+    ansible.builtin.set_fact:
+      iso_path: "{{ (iso_path.stdout | from_json).path }}/template/iso"
+
   - name: Download Ubuntu cloud image
     ansible.builtin.get_url:
       url: https://cloud-images.ubuntu.com/minimal/releases/noble/release/ubuntu-24.04-minimal-cloudimg-amd64.img
-      dest: /var/lib/vz/template/iso/ubuntu-24.04-minimal-cloudimg-amd64.img
+      dest: "{{ iso_path }}/ubuntu-24.04-minimal-cloudimg-amd64.img"
       checksum: sha256:https://cloud-images.ubuntu.com/minimal/releases/noble/release/SHA256SUMS
-
-  - name: Get next VMID
-    ansible.builtin.shell: |
-      pvesh get /cluster/nextid
-    register: next_vmid
-
-  - name: Set VMID
-    ansible.builtin.set_fact:
-      vmid: "{{ next_vmid.stdout }}"
 
   - name: Generate VM name
     ansible.builtin.shell: |
@@ -48,6 +48,15 @@
   - name: Set VM name
     ansible.builtin.set_fact:
       vm_name: "{{ vm_name.stdout }}"
+
+  - name: Get next VMID
+    ansible.builtin.shell: |
+      pvesh get /cluster/nextid
+    register: next_vmid
+
+  - name: Set VMID
+    ansible.builtin.set_fact:
+      vmid: "{{ next_vmid.stdout }}"
 
   - name: Create new VM
     ansible.builtin.shell: |
@@ -64,7 +73,7 @@
 
   - name: Convert cloud image to disk
     ansible.builtin.shell: |
-      qm importdisk {{ vmid }} /var/lib/vz/template/iso/ubuntu-24.04-minimal-cloudimg-amd64.img {{ proxmox_disk_storage }}
+      qm importdisk {{ vmid }} "{{ iso_path }}/ubuntu-24.04-minimal-cloudimg-amd64.img" {{ proxmox_disk_storage }}
     register: disk_location
 
   - name: Set disk location
