@@ -1,21 +1,32 @@
-- hosts: physical
+- hosts: proxmox
   become_method: sudo
   become_user: root
   become: true
 
   vars:
-    raid_name: raid
+    vm_disk_size: 32G
+    vm_memory: 2048
+    vm_cores: 2
+    vm_user: user
+    vm_tags: "kube_control_plane, etcd, kube_node"
 
   tasks:
-  - name: Download Ubuntu cloud image
-    get_url:
-      url: https://cloud-images.ubuntu.com/minimal/releases/focal/release/ubuntu-20.04-minimal-cloudimg-amd64.img
-      dest: /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04-minimal-cloudimg-amd64.img
-      checksum: sha256:https://cloud-images.ubuntu.com/minimal/releases/focal/release/SHA256SUMS
+  - name: Get local SSH public key
+    ansible.builtin.shell: |
+      ssh-agent sh -c 'ssh-add > /dev/null 2>&1 ; ssh-add -L'
+    register: ssh_public_key
+    become: false
+    delegate_to: localhost
+  
+  - name: Set SSH public key
+    ansible.builtin.set_fact:
+      ssh_public_key: "{{ ssh_public_key.stdout }}"
 
-  - name: Install PVE server dependencies
-    pip:
-      name: proxmoxer
+  - name: Download Ubuntu cloud image
+    ansible.builtin.get_url:
+      url: https://cloud-images.ubuntu.com/minimal/releases/noble/release/ubuntu-24.04-minimal-cloudimg-amd64.img
+      dest: /var/lib/vz/template/iso/ubuntu-24.04-minimal-cloudimg-amd64.img
+      checksum: sha256:https://cloud-images.ubuntu.com/minimal/releases/noble/release/SHA256SUMS
 
   - name: Get next VMID
     ansible.builtin.shell: |
@@ -23,42 +34,73 @@
     register: next_vmid
 
   - name: Set VMID
-    set_fact:
+    ansible.builtin.set_fact:
       vmid: "{{ next_vmid.stdout }}"
+
+  - name: Get storage name
+    ansible.builtin.shell: |
+      pvesm status --content images | awk 'NR>1' | head -n 1 | awk '{ print $1 }'
+    register: storage_name
+
+  - name: Set storage name
+    ansible.builtin.set_fact:
+      storage_name: "{{ storage_name.stdout }}"
+
+  - name: Generate VM name
+    ansible.builtin.shell: |
+      echo "k8s-node-$(tr -dc a-z0-9 </dev/urandom | head -c 5)"
+    register: vm_name
+  
+  - name: Set VM name
+    ansible.builtin.set_fact:
+      vm_name: "{{ vm_name.stdout }}"
 
   - name: Create new VM
     ansible.builtin.shell: |
-      qm create {{ vmid }} --name {{ proxmox_template_name }} --memory 8096 --net0 virtio,bridge=vmbr0
+      qm create {{ vmid }} \
+        --agent 1 \
+        --cores {{ vm_cores }} \
+        --ipconfig0 ip=dhcp \
+        --memory {{ vm_memory }} \
+        --name {{ vm_name }} \
+        --net0 virtio,bridge=vmbr0 \
+        --serial0 socket \
+        --tags "{{ vm_tags }}" \
+        --vga serial0
 
   - name: Convert cloud image to disk
     ansible.builtin.shell: |
-      qm importdisk {{ vmid }} /mnt/pve/{{ raid_name }}/template/iso/ubuntu-20.04-minimal-cloudimg-amd64.img {{ raid_name }}
+      qm importdisk {{ vmid }} /var/lib/vz/template/iso/ubuntu-24.04-minimal-cloudimg-amd64.img {{ storage_name }}
 
   - name: Assign to to SCSi drive on VM
     ansible.builtin.shell: |
-      qm set {{ vmid }} --scsihw virtio-scsi-pci --scsi0 {{ raid_name }}:{{ vmid }}/vm-{{ vmid }}-disk-0.raw
+      qm set {{ vmid }} --scsihw virtio-scsi-pci --scsi0 {{ storage_name }}:{{ vmid }}/vm-{{ vmid }}-disk-0.raw
 
-  - name: Create Cloud-init drive
+  - name: Resize disk
     ansible.builtin.shell: |
-      qm set {{ vmid }} --ide2 {{ raid_name }}:cloudinit
+      qm resize {{ vmid }} scsi0 {{ vm_disk_size }}
 
   - name: Set boot priority
     ansible.builtin.shell: |
       qm set {{ vmid }} --boot c --bootdisk scsi0
 
-  - name: Set VGA output
+  - name: Create cloud-init drive
     ansible.builtin.shell: |
-      qm set {{ vmid }} --serial0 socket --vga serial0
+      qm set {{ vmid }} --scsi1 {{ storage_name }}:cloudinit
 
-  - name: Set Cloud-init config file
+  - name: Enable snippets
+    ansible.builtin.shell: |
+      pvesm set {{ storage_name }} --content images,rootdir,vztmpl,backup,iso,snippets
+
+  - name: Set cloud-init config file
     ansible.builtin.copy:
-      dest: /mnt/pve/{{ raid_name }}/snippets/user-config.yml
+      dest: /var/lib/vz/snippets/{{ vm_name }}-config.yaml
       content: |
         #cloud-config
-        hostname: ubuntu2004
+        hostname: {{ vm_name }}
         manage_etc_hosts: true
-        user: ubuntu
-        password: ubuntu
+        user: {{ vm_user }}
+        password: {{ vm_user }}
         chpasswd:
           expire: False
         users:
@@ -72,20 +114,12 @@
           - sudo rm /var/lib/dbus/machine-id
           - sudo truncate -s 0 /etc/machine-id
           - sudo ln -s /etc/machine-id /var/lib/dbus/machine-id
-          - mkdir -p /home/ubuntu/.ssh
+          - mkdir -p /home/{{ vm_user }}/.ssh
           - shutdown
 
-  - name: Assign to to SCSi drive on VM
+  - name: Mount cloud-init file
     ansible.builtin.shell: |
-      qm set {{ vmid }} --ipconfig0 ip=dhcp
-
-  - name: Enable QEMU Guest Agent
-    ansible.builtin.shell: |
-      qm set {{ vmid }} --agent 1
-
-  - name: Assign to to SCSi drive on VM
-    ansible.builtin.shell: |
-      qm set {{ vmid }} --cicustom "user={{ raid_name }}:snippets/user-config.yml"
+      qm set {{ vmid }} --cicustom "user={{ storage_name }}:snippets/{{ vm_name }}-config.yaml"
 
   - name: Start VM
     ansible.builtin.shell: |
@@ -99,6 +133,15 @@
     delay: 10
     until: '"stopped" in vm_status.stdout'
 
-  - name: Convert VM to template
+  - name: Clean up cloud-init file
+    ansible.builtin.file:
+      path: /var/lib/vz/snippets/{{ vm_name }}-config.yaml
+      state: absent
+
+  - name: Snapshot VM
     ansible.builtin.shell: |
-      qm template {{ vmid }}
+      qm snapshot {{ vmid }} base
+
+  - name: Start VM
+    ansible.builtin.shell: |
+      qm start {{ vmid }}
