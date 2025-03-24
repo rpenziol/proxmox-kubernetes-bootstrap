@@ -37,7 +37,8 @@ class ProxmoxVM:
 
     @property
     def tags(self):
-        return self.meta["tags"].split(";")
+        tags = [tag.strip() for tag in self.meta["tags"].split(",")]
+        return tags
 
     @property
     def ip(self):

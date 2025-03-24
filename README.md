@@ -31,13 +31,13 @@ Fill in the `group_vars/all.yaml` with values that are appropriate for your envi
 
 ## Create Kubernetes node VM(s)
 
-By default, a VM is tagged with **kube_node**, **kube_control_plane**, and **etcd**
+By default, `create-k8s-vm.yaml` will tag the VM with **kube_node**, **kube_control_plane**, and **etcd**
 
 * **kube_node** : Kubernetes nodes where pods will run.
 * **kube_control_plane** : Where Kubernetes control plane components (apiserver, scheduler, controller) will run.
 * **etcd**: The etcd server. You should have 3 servers for failover purpose.
 
-For high-availability, it is recommended to have 3+ nodes with the default roles.
+For high-availability, it is recommended to have 3+ nodes with these roles.
 See [Kubespray's documentation](https://github.com/kubernetes-sigs/kubespray/blob/v2.27.0/docs/ansible/inventory.md) for more details.
 
 To adjust the role(s) of the VM, adjust the tags:
