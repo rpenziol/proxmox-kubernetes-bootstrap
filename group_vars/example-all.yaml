@@ -4,3 +4,14 @@ proxmox_password: password
 proxmox_ssh_port: 22
 proxmox_https_port: 8006
 proxmox_trust_invalid_https_certs: true
+
+# Used to provision VMs
+vm_disk_size: 64G
+vm_memory: 4096
+vm_cores: 2
+vm_user: user
+vm_password: password
+vm_tags: "kube_control_plane, etcd, kube_node"
+proxmox_disk_storage: local-lvm
+proxmox_iso_storage: local
+proxmox_snippet_storage: local

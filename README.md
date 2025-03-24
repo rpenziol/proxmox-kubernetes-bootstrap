@@ -29,26 +29,37 @@ cp group_vars/example-all.yaml group_vars/all.yaml
 
 Fill in the `group_vars/all.yaml` with values that are appropriate for your environment.
 
-## Create Kubernetes controller node VMs
+## Create Kubernetes node VM(s)
+
+By default, a VM is tagged with **kube_node**, **kube_control_plane**, and **etcd**
+
+* **kube_node** : Kubernetes nodes where pods will run.
+* **kube_control_plane** : Where Kubernetes control plane components (apiserver, scheduler, controller) will run.
+* **etcd**: The etcd server. You should have 3 servers for failover purpose.
+
+For high-availability, it is recommended to have 3+ nodes with the default roles.
+See [Kubespray's documentation](https://github.com/kubernetes-sigs/kubespray/blob/v2.27.0/docs/ansible/inventory.md) for more details.
+
+To adjust the role(s) of the VM, adjust the tags:
 
 ```bash
-# Use a for loop to create multiple systems. Set NUM_CONTROLLERS equal to the number of VMs you want.
-# Minimum required: 1
-# Kubespray requires an odd number of control plane nodes.
-NUM_CONTROLLERS=1
-for i in {1..${NUM_CONTROLLERS}} ; do ansible-playbook create-k8s-vm.yaml -K ; done
+# worker, control plane, and etcd node
+ansible-playbook create-k8s-vm.yaml -K
+
+# control plane and etcd node
+ansible-playbook create-k8s-vm.yaml --extra-vars "vm_tags=kube_control_plane,etcd" -K
+
+# worker node
+ansible-playbook create-k8s-vm.yaml --extra-vars "vm_tags=kube_node" -K
+
+# control plane node
+ansible-playbook create-k8s-vm.yaml --extra-vars "vm_tags=kube_control_plane" -K
+
+# etcd node
+ansible-playbook create-k8s-vm.yaml --extra-vars "vm_tags=etcd" -K
 ```
 
-## Create Kubernetes worker node VMs
-
-```bash
-# Use a for loop to create multiple systems. Set NUM_WORKERS equal to the number of VMs you want.
-# Minimum required: 1
-NUM_WORKERS=1
-for i in {1..${NUM_WORKERS}} ; do ansible-playbook create-k8s-vm.yaml -K ; done
-```
-
-# Kubespray - Deploy Kubernetes
+# Deploy Kubernetes via Kubespray
 
 ## Copy sample inventory files
 

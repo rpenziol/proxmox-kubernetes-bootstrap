@@ -68,7 +68,7 @@ class ProxmoxAPI:
 
     def auth(self):
         conn = http.client.HTTPSConnection(
-            self.url, context=ssl._create_unverified_context()
+            self.url, context=ssl._create_unverified_context(), timeout=10
         )
         headers = {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -87,7 +87,7 @@ class ProxmoxAPI:
 
     def get(self, url: str, data=None):
         conn = http.client.HTTPSConnection(
-            self.url, context=ssl._create_unverified_context()
+            self.url, context=ssl._create_unverified_context(), timeout=10
         )
         headers = {"Cookie": f"PVEAuthCookie={self.auth_cookie['ticket']}"}
         conn.request("GET", url, body=data, headers=headers)

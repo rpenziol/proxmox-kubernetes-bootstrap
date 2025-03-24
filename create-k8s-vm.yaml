@@ -3,17 +3,6 @@
   become_user: root
   become: true
 
-  vars:
-    vm_disk_size: 32G
-    vm_memory: 2048
-    vm_cores: 2
-    vm_user: user
-    vm_password: password
-    vm_tags: "kube_control_plane, etcd, kube_node"
-    proxmox_disk_storage: local-zfs
-    proxmox_iso_storage: local
-    proxmox_snippet_storage: local
-
   tasks:
   - name: Get local SSH public key
     ansible.builtin.shell: |
