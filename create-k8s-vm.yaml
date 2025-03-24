@@ -8,6 +8,7 @@
     vm_memory: 2048
     vm_cores: 2
     vm_user: user
+    vm_password: password
     vm_tags: "kube_control_plane, etcd, kube_node"
     proxmox_disk_storage: local-zfs
     proxmox_iso_storage: local
@@ -28,11 +29,11 @@
   - name: Determine ISO download path
     ansible.builtin.shell: |
       pvesh get /storage/{{ proxmox_iso_storage }} --output-format json
-    register: iso_path
+    register: iso_storage
 
   - name: Set ISO download path
     ansible.builtin.set_fact:
-      iso_path: "{{ (iso_path.stdout | from_json).path }}/template/iso"
+      iso_path: "{{ (iso_storage.stdout | from_json).path }}/template/iso"
 
   - name: Download Ubuntu cloud image
     ansible.builtin.get_url:
@@ -101,15 +102,24 @@
     ansible.builtin.shell: |
       qm set {{ vmid }} --scsi1 {{ proxmox_snippet_storage }}:cloudinit
 
+  - name: Determine snippets path
+    ansible.builtin.shell: |
+      pvesh get /storage/{{ proxmox_snippet_storage }} --output-format json
+    register: snippets_storage
+
+  - name: Set ISO download path
+    ansible.builtin.set_fact:
+      snippets_path: "{{ (snippets_storage.stdout | from_json).path }}/snippets"
+
   - name: Set cloud-init config file
     ansible.builtin.copy:
-      dest: /var/lib/vz/snippets/{{ vm_name }}-config.yaml
+      dest: "{{ snippets_path }}/{{ vm_name }}-config.yaml"
       content: |
         #cloud-config
         hostname: {{ vm_name }}
         manage_etc_hosts: true
         user: {{ vm_user }}
-        password: {{ vm_user }}
+        password: {{ vm_password }}
         chpasswd:
           expire: False
         ssh_authorized_keys:
@@ -140,7 +150,7 @@
     ansible.builtin.shell: |
       qm status {{ vmid }}
     register: vm_status
-    retries: 25
+    retries: 50
     delay: 10
     until: '"stopped" in vm_status.stdout'
 
@@ -150,7 +160,7 @@
 
   - name: Clean up cloud-init file
     ansible.builtin.file:
-      path: /var/lib/vz/snippets/{{ vm_name }}-config.yaml
+      path: "{{ snippets_path }}/{{ vm_name }}-config.yaml"
       state: absent
 
   - name: Snapshot VM
