@@ -103,13 +103,16 @@
         password: {{ vm_user }}
         chpasswd:
           expire: False
+        ssh_authorized_keys:
+          - {{ ssh_public_key }}
         users:
           - default
         package_upgrade: true
         packages:
           - qemu-guest-agent
         runcmd:
-          - sudo sed -i "/^[^#]*PasswordAuthentication.*/c\PasswordAuthentication yes" /etc/ssh/sshd_config
+          - sudo sed -i 's/^[# ]*PasswordAuthentication .*/PasswordAuthentication no/g' /etc/ssh/sshd_config
+          - sudo sed -i 's/^[# ]*PermitRootLogin .*/PermitRootLogin no/g' /etc/ssh/sshd_config
           - sudo rm /etc/machine-id
           - sudo rm /var/lib/dbus/machine-id
           - sudo truncate -s 0 /etc/machine-id
@@ -132,6 +135,10 @@
     retries: 25
     delay: 10
     until: '"stopped" in vm_status.stdout'
+
+  - name: Unmount cloud-init drive
+    ansible.builtin.shell: |
+      qm disk unlink {{ vmid }} --idlist scsi1
 
   - name: Clean up cloud-init file
     ansible.builtin.file:
