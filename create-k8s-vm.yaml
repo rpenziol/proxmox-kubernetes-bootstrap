@@ -9,6 +9,9 @@
     vm_cores: 2
     vm_user: user
     vm_tags: "kube_control_plane, etcd, kube_node"
+    proxmox_disk_storage: local-zfs
+    proxmox_iso_storage: local
+    proxmox_snippet_storage: local
 
   tasks:
   - name: Get local SSH public key
@@ -37,15 +40,6 @@
     ansible.builtin.set_fact:
       vmid: "{{ next_vmid.stdout }}"
 
-  - name: Get storage name
-    ansible.builtin.shell: |
-      pvesm status --content images | awk 'NR>1' | head -n 1 | awk '{ print $1 }'
-    register: storage_name
-
-  - name: Set storage name
-    ansible.builtin.set_fact:
-      storage_name: "{{ storage_name.stdout }}"
-
   - name: Generate VM name
     ansible.builtin.shell: |
       echo "k8s-node-$(tr -dc a-z0-9 </dev/urandom | head -c 5)"
@@ -70,11 +64,17 @@
 
   - name: Convert cloud image to disk
     ansible.builtin.shell: |
-      qm importdisk {{ vmid }} /var/lib/vz/template/iso/ubuntu-24.04-minimal-cloudimg-amd64.img {{ storage_name }}
+      qm importdisk {{ vmid }} /var/lib/vz/template/iso/ubuntu-24.04-minimal-cloudimg-amd64.img {{ proxmox_disk_storage }}
+    register: disk_location
+
+  - name: Set disk location
+    ansible.builtin.shell: |
+      echo "{{ disk_location.stdout }}" | tail -n 1 | grep -o -E "'.*'" | sed "s/'//g" | sed 's/unused[0-9]*://g'
+    register: disk_location
 
   - name: Assign to to SCSi drive on VM
     ansible.builtin.shell: |
-      qm set {{ vmid }} --scsihw virtio-scsi-pci --scsi0 {{ storage_name }}:{{ vmid }}/vm-{{ vmid }}-disk-0.raw
+      qm set {{ vmid }} --scsihw virtio-scsi-pci --scsi0 {{ disk_location.stdout }}
 
   - name: Resize disk
     ansible.builtin.shell: |
@@ -84,13 +84,13 @@
     ansible.builtin.shell: |
       qm set {{ vmid }} --boot c --bootdisk scsi0
 
-  - name: Create cloud-init drive
-    ansible.builtin.shell: |
-      qm set {{ vmid }} --scsi1 {{ storage_name }}:cloudinit
-
   - name: Enable snippets
     ansible.builtin.shell: |
-      pvesm set {{ storage_name }} --content images,rootdir,vztmpl,backup,iso,snippets
+      pvesm set {{ proxmox_snippet_storage }} --content images,rootdir,vztmpl,backup,iso,snippets
+
+  - name: Create cloud-init drive
+    ansible.builtin.shell: |
+      qm set {{ vmid }} --scsi1 {{ proxmox_snippet_storage }}:cloudinit
 
   - name: Set cloud-init config file
     ansible.builtin.copy:
@@ -117,12 +117,11 @@
           - sudo rm /var/lib/dbus/machine-id
           - sudo truncate -s 0 /etc/machine-id
           - sudo ln -s /etc/machine-id /var/lib/dbus/machine-id
-          - mkdir -p /home/{{ vm_user }}/.ssh
           - shutdown
 
   - name: Mount cloud-init file
     ansible.builtin.shell: |
-      qm set {{ vmid }} --cicustom "user={{ storage_name }}:snippets/{{ vm_name }}-config.yaml"
+      qm set {{ vmid }} --cicustom "user={{ proxmox_snippet_storage }}:snippets/{{ vm_name }}-config.yaml"
 
   - name: Start VM
     ansible.builtin.shell: |
